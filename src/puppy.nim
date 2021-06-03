@@ -128,12 +128,16 @@ else:
   ): int {.cdecl.} =
     if size != 1:
       raise newException(PuppyError, "Unexpected curl write callback size")
-    let
-      outbuf = cast[ref string](outstream)
-      i = outbuf[].len
-    outbuf[].setLen(outbuf[].len + count)
-    copyMem(outbuf[][i].addr, buffer, count)
+    let outbuf = cast[ref string](outstream)
+    outbuf[] &= buffer
     result = size * count
+    # let
+    #   outbuf = cast[ref string](outstream)
+    # when not defined(gcArc):
+    #   let i = outbuf[].len
+    #   outbuf[].setLen(outbuf[].len + count)
+    #   copyMem(outbuf[][i].addr, buffer, count)
+    # result = size * count
 
   proc fetch*(req: Request): Response =
     result = Response()
@@ -175,13 +179,16 @@ else:
       var httpCode: uint32
       discard curl.easy_getinfo(INFO_RESPONSE_CODE, httpCode.addr)
       result.code = httpCode.int
-      for headerLine in headerData[].split(CRLF):
-        let arr = headerLine.split(":", 1)
-        if arr.len == 2:
-          result.headers[arr[0].strip()] = arr[1].strip()
+      echo headerData != nil
+      if headerData != nil:
+        echo headerData[]
+        for headerLine in headerData[].split(CRLF):
+          let arr = headerLine.split(":", 1)
+          if arr.len == 2:
+            result.headers[arr[0].strip()] = arr[1].strip()
       result.body = bodyData[]
-      if result.headers["Content-Encoding"] == "gzip":
-        result.body = uncompress(result.body, dfGzip)
+      # if result.headers["Content-Encoding"] == "gzip":
+      #   result.body = uncompress(result.body, dfGzip)
     else:
       result.error = $easy_strerror(ret)
 
